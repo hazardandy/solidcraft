@@ -709,6 +709,15 @@ fn numbered_part(path: &Path, values: Value) -> Session {
     s
 }
 
+/// The design at `path` opened, with `bom_type` written straight into its own properties, as a
+/// design from another tool may have it (SolidCraft's commands refuse that key on a design).
+fn design_with_bom_type(path: &Path, bom_type: &str) -> Session {
+    let mut s = Session::default();
+    run(&mut s, "doc.open", json!({"path": path}));
+    s.doc_mut().metadata.0.insert("bom_type".into(), json!(bom_type));
+    s
+}
+
 fn part_property(s: &Session, component: u64, key: &str) -> Option<String> {
     s.doc.components.iter().find(|c| c.id == component).and_then(|c| c.metadata.text(key)).map(str::to_string)
 }
@@ -752,6 +761,13 @@ fn linked_part_properties_follow_the_design_and_keep_values_set_in_the_assembly(
     assert_eq!(part_property(&s, other, "description").as_deref(), Some("Plate v2"));
     let warnings = r["warnings"].to_string();
     assert!(warnings.contains("keeps its part property `description`") && warnings.contains("Plate v2"), "{r}");
+
+    // A design written by another tool may carry a component's own keys: they stay the assembly's.
+    part = design_with_bom_type(&file, "phantom");
+    run(&mut part, "file.save", json!({}));
+    run(&mut s, "component.update_links", json!({}));
+    assert_eq!(part_property(&s, c, "bom_type").as_deref(), Some("purchased"));
+    assert_eq!(part_property(&s, other, "bom_type"), None);
 
     // A property the design drops goes from the component too, and the record survives a save.
     run(&mut part, "document.metadata.remove", json!({"keys": ["revision"]}));

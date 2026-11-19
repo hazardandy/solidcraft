@@ -642,7 +642,10 @@ fn inherit_metadata(s: &mut Session, component: u64, source: &solidcraft_doc::Me
     let (name, before) = (c.name.clone(), c.metadata.clone());
     let mut after = before.clone();
     let mut warnings = Vec::new();
-    let keys: std::collections::BTreeSet<&String> = source.0.keys().chain(taken.0.keys()).collect();
+    // A component's own keys (bill of materials type, static material, quantity, virtual) are the
+    // assembly's, even when a design written by another tool carries them.
+    let keys: std::collections::BTreeSet<&String> =
+        source.0.keys().chain(taken.0.keys()).filter(|k| !solidcraft_doc::metadata::PART_ONLY.contains(&k.as_str())).collect();
     for key in keys {
         let (theirs, was) = (source.0.get(key), taken.0.get(key));
         let here = after.0.get(key);
